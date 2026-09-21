@@ -89,8 +89,12 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 
-# Copy node_modules from deps stage
+# Copy node_modules from deps stage (per-workspace node_modules included —
+# workspace-local bins like packages/zod-types' tsup live there)
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=deps /app/packages ./packages
 
 # Copy source code (pinned upstream tree, unmodified)
 COPY --from=source /tmp/src ./
