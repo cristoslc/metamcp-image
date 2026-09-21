@@ -66,14 +66,14 @@ jobs:
 
       - name: Record amd64 manifest digest
         run: |
-          docker buildx imagetools inspect "$IMAGE:${SHA_PREFIX}" \
-            | grep -A2 "linux/amd64" > /tmp/digest.txt
-          cat /tmp/digest.txt
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE:${SHA_PREFIX}" \
+            | grep -oP 'sha256:[0-9a-f]{64}' | head -1)
+          echo "Digest: $DIGEST"
           {
             echo "### Pushed image"
             echo ""
             echo '```'
-            grep "Name:" /tmp/digest.txt | head -1
+            echo "$IMAGE@$DIGEST"
             echo '```'
             echo ""
             echo "Pin this linux/amd64 manifest digest in"
