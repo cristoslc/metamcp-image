@@ -178,8 +178,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./
 # Install production dependencies only
 RUN CI=true pnpm install --prod
 
-# Install drizzle-kit locally in backend for migrations
-RUN cd apps/backend && CI=true pnpm add drizzle-kit@0.31.1
+# Install drizzle-kit locally in backend for migrations. At the ff4ff2de9d
+# lockfile the backend already resolves drizzle-kit 0.31.9 (better-auth peer
+# + devDependency) in the prod install above; upstream's separate
+# `pnpm add drizzle-kit@0.31.1` rewrites the lockfile at runner time and
+# trips pnpm's included-deps-conflict guard under CI. The prod tree already
+# has the binary — just verify it resolves.
+RUN pnpm --dir apps/backend exec drizzle-kit --version
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
