@@ -1,0 +1,81 @@
+name: Build and push MetaMCP image
+
+# Builds the MetaMCP image from UNMODIFIED upstream source at the SHA
+# pinned in Dockerfile (METAMCP_SOURCE_SHA), on a native linux/amd64
+# runner, and pushes it to ghcr.io/cristoslc/metamcp. Tagged with the
+# sha-prefix of the pinned source SHA and :latest.
+#
+# Canonical Dockerfile: private Homelab repo
+# services/ai-chatbot/metamcp/Dockerfile (RUNBOOK-016 Path B). This vendored
+# copy must be identical; CI fails loud if it drifts from the upstream
+# build recipe (see test in Homelab).
+#
+# Trigger: manual (workflow_dispatch). Flow per RUNBOOK-016:
+#   1. Bump METAMCP_SOURCE_SHA in Dockerfile (both copies) + commit
+#   2. Run this workflow
+#   3. Record the linux/amd64 manifest digest from the job summary
+#   4. Bump the digest in Homelab services/ai-chatbot/metamcp/docker-compose.yml
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/metamcp
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Assert Dockerfile pins an upstream source SHA
+        run: |
+          SHA=$(grep -oP '(?<=^ARG METAMCP_SOURCE_SHA=)[0-9a-f]{40}' Dockerfile)
+          if [ -z "$SHA" ]; then
+            echo "Dockerfile must pin ARG METAMCP_SOURCE_SHA=<40-hex>"
+            exit 1
+          fi
+          echo "Pinned source SHA: $SHA"
+          echo "SHA_PREFIX=${SHA:0:10}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ env.SHA_PREFIX }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Record amd64 manifest digest
+        run: |
+          docker buildx imagetools inspect "$IMAGE:${SHA_PREFIX}" \
+            | grep -A2 "linux/amd64" > /tmp/digest.txt
+          cat /tmp/digest.txt
+          {
+            echo "### Pushed image"
+            echo ""
+            echo '```'
+            grep "Name:" /tmp/digest.txt | head -1
+            echo '```'
+            echo ""
+            echo "Pin this linux/amd64 manifest digest in"
+            echo "services/ai-chatbot/metamcp/docker-compose.yml."
+          } >> "$GITHUB_STEP_SUMMARY"
