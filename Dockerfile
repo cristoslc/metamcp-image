@@ -179,7 +179,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./
 RUN CI=true pnpm install --prod
 
 # Install drizzle-kit locally in backend for migrations
-RUN cd apps/backend && pnpm add drizzle-kit@0.31.1
+RUN cd apps/backend && CI=true pnpm add drizzle-kit@0.31.1
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
