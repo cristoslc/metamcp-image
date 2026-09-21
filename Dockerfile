@@ -10,7 +10,6 @@
 # has no images (verified 2026-09-21 via `docker buildx imagetools inspect`
 # — "not found"). Only the merge chain contains the fix, so we build it
 # ourselves, unmodified.
-#
 # Why unmodified: the moment we patch source files, we own a fork — merge
 # conflicts on every re-pin, silent divergence, no upstream review. The
 # Chromium deps in the runner stage are the ONLY delta from upstream's
@@ -20,13 +19,20 @@
 # fork-trigger policy and the expiry clause (revert to the upstream
 # digest-bump fast path once upstream publishes images with the fixes).
 #
-# Source pin: METAMCP_SOURCE_SHA is an exact upstream commit. ecf354a8e8
-# is the merge commit of PR #300 (also carries #295). Upstream's default
-# branch is `ai-dev` (main is stale at 250240be7d, 2026-02-08, and does
-# NOT contain PR #300); ai-dev carries 96 more commits of unvetted work on
-# top, so the minimal safe pin is the PR #300 merge itself. Bump only by
-# re-verifying the fix is present (grep the tree for the sessionStorage
-# guard) and the 2.5.x tags still have no published images.
+# Source pin: METAMCP_SOURCE_SHA is an exact upstream commit. Started at
+# ecf354a8e8 (Merge PR #300 SSR-safe OAuth provider, carrying #295); bumped
+# 2026-09-21 to ff4ff2de9d (ai-dev tip) because that pin ships a broken
+# oauth.repo cleanupExpired — `isNotNull(...).not()` crashes drizzle every
+# 5 minutes (the correct form is isNull(), fixed in e29ce8f9f6 "bug
+# fixes") — AND ships the 0014_oauth_refresh_token migration UNJOURNALED
+# (journal still ends at 0013 in the ecf pin; fixed in 5f868084b3), so the
+# runner's `pnpm install --prod` + drizzle journal skipped the
+# refresh_token columns entirely. ff4ff2de9d (ai-dev tip, 2026-06-22)
+# contains e29ce8f9f6 (both fixes) + 5f868084b3 (journal fix) + only a
+# README edit on top; ai-dev carries 96 more unvetted commits on top, so
+# this is the newest commit whose delta from ecf354a8e8 we have reviewed.
+# Bump only by re-verifying the fix is present (grep the tree for the
+# sessionStorage guard) and re-auditing the delta.
 #
 # Build steps mirror upstream's own Dockerfile at the pinned SHA (fetched
 # 2026-09-21; identical to the default-branch version): uv:debian base,
@@ -42,7 +48,7 @@
 #   → linux/amd64 manifest = sha256:98d2a442cb4612eaf817783471383e073d51f34178e3bbcbbea829ee5d736ad9
 FROM ghcr.io/astral-sh/uv:debian@sha256:98d2a442cb4612eaf817783471383e073d51f34178e3bbcbbea829ee5d736ad9 AS base
 
-ARG METAMCP_SOURCE_SHA=ecf354a8e86f6a805c632e12109c2c5d3a8265ce
+ARG METAMCP_SOURCE_SHA=ff4ff2de9d25453c52dcc7be32680b30700a6012
 
 # Install Node.js and pnpm directly (mirrors upstream Dockerfile)
 RUN apt-get update && apt-get install -y \
