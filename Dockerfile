@@ -181,13 +181,16 @@ RUN CI=true pnpm install --prod
 # Install drizzle-kit locally in backend for migrations (entrypoint runs
 # `pnpm exec drizzle-kit migrate` from apps/backend). A bare `pnpm add`
 # at the runner stage rewrites the lockfile and trips pnpm's
-# included-deps-conflict guard (deps dir installed --prod; adding a
-# devDependency wants devDeps included), and npm chokes on the
-# workspace:* protocol in the backend package.json. Use pnpm with a
-# dedicated lockfile-free store: --ignore-workspace scopes it to the
-# backend dir only.
-RUN cd apps/backend && CI=true pnpm add --ignore-workspace --lockfile-only=false --no-strict-peer-dependencies drizzle-kit@0.31.9 \
-    && ./node_modules/.bin/drizzle-kit --version
+# included-deps-conflict guard, npm chokes on workspace:*, and
+# --ignore-workspace drops the @repo/* workspace deps the backend
+# package.json references. Upstream needs drizzle-kit runnable from
+# apps/backend at runtime; fetch just the package with pnpm into a
+# scratch dir and link its dist into the backend's node_modules.
+RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
+    && mkdir -p /app/apps/backend/node_modules/drizzle-kit \
+    && cp -r /tmp/node_modules/drizzle-kit/. /app/apps/backend/node_modules/drizzle-kit/ \
+    && cp -r /tmp/node_modules/.bin/drizzle-kit /app/apps/backend/node_modules/.bin/ 2>/dev/null || true \
+    && /app/apps/backend/node_modules/drizzle-kit/bin.cjs --version
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
