@@ -182,9 +182,11 @@ RUN CI=true pnpm install --prod
 # `pnpm exec drizzle-kit migrate` from apps/backend). A bare `pnpm add`
 # at the runner stage rewrites the lockfile and trips pnpm's
 # included-deps-conflict guard (deps dir installed --prod; adding a
-# devDependency wants devDeps included). Install straight into the
-# backend's node_modules from the registry, bypassing the lockfile.
-RUN cd apps/backend && CI=true npm install --no-save --no-package-lock drizzle-kit@0.31.9 \
+# devDependency wants devDeps included), and npm chokes on the
+# workspace:* protocol in the backend package.json. Use pnpm with a
+# dedicated lockfile-free store: --ignore-workspace scopes it to the
+# backend dir only.
+RUN cd apps/backend && CI=true pnpm add --ignore-workspace --lockfile-only=false --no-strict-peer-dependencies drizzle-kit@0.31.9 \
     && ./node_modules/.bin/drizzle-kit --version
 
 # Copy startup script
