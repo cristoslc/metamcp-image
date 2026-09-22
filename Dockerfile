@@ -195,7 +195,7 @@ RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
     && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
     && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' > /app/apps/backend/node_modules/.bin/drizzle-kit \
     && chmod +x /app/apps/backend/node_modules/.bin/drizzle-kit \
-    && cd /app/apps/backend && CI=true node node_modules/.bin/drizzle-kit --version
+    && cd /app/apps/backend && CI=true node node_modules/drizzle-kit/bin.cjs --version
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
