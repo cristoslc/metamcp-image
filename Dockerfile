@@ -180,22 +180,22 @@ RUN CI=true pnpm install --prod
 
 # Install drizzle-kit locally in backend for migrations (entrypoint runs
 # `pnpm exec drizzle-kit migrate` from apps/backend). A bare `pnpm add`
-# at the runner stage rewrites the lockfile and trips pnpm's
-# included-deps-conflict guard, npm chokes on workspace:*, and
-# --ignore-workspace drops the @repo/* workspace deps the backend
-# package.json references. Install drizzle-kit WITH its full pnpm store
-# (esbuild etc.) into the backend node_modules via a --ignore-workspace
-# install rooted at the backend dir, keeping upstream's devDep out of the
-# prod lockfile but present on disk. The .bin shim is rewritten to a
-# direct node call (pnpm shims hardcode /tmp paths).
+# at the runner stage trips pnpm's included-deps-conflict guard; npm
+# chokes on workspace:*. So: install drizzle-kit (with its deps) into a
+# scratch dir via pnpm --ignore-workspace, then copy the packages flat
+# into backend node_modules. Flat is fine — Node resolves
+# require('esbuild') from node_modules/esbuild sitting next to
+# drizzle-kit. The .bin shim is rewritten to a direct node call (pnpm
+# shims hardcode the scratch /tmp paths). Verify with the exact command
+# the entrypoint runs.
 RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
-    && cp -r /tmp/node_modules/.pnpm /app/apps/backend/node_modules/.pnpm \
-    && mkdir -p /app/apps/backend/node_modules/drizzle-kit \
-    && cp -r /tmp/node_modules/.pnpm/drizzle-kit@0.31.9/node_modules/drizzle-kit/. /app/apps/backend/node_modules/drizzle-kit/ \
-    && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
-    && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' > /app/apps/backend/node_modules/.bin/drizzle-kit \
+    && for d in /tmp/node_modules/*/; do n=$(basename "$d"); \
+         [ "$n" = ".pnpm" ] && continue; cp -rL "$d" /app/apps/backend/node_modules/; done \
+    && cp -rL /tmp/node_modules/.pnpm /app/apps/backend/node_modules/.pnpm \
+    && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' \
+         > /app/apps/backend/node_modules/.bin/drizzle-kit \
     && chmod +x /app/apps/backend/node_modules/.bin/drizzle-kit \
-    && cd /app/apps/backend && CI=true node node_modules/drizzle-kit/bin.cjs --version
+    && cd /app/apps/backend && CI=true pnpm exec drizzle-kit --version
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
