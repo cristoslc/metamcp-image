@@ -189,14 +189,10 @@ RUN CI=true pnpm install --prod
 # path). The .bin shim is rewritten to a direct node call (pnpm shims
 # hardcode the scratch /tmp paths).
 RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
-    && cp -r /tmp/node_modules/.pnpm/drizzle-kit@0.31.9 /app/apps/backend/node_modules/.pnpm-drizzle-kit \
-    && mkdir -p /app/apps/backend/node_modules/drizzle-kit \
-    && cp -r /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/drizzle-kit/. /app/apps/backend/node_modules/drizzle-kit/ \
-    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/esbuild /app/apps/backend/node_modules/esbuild \
-    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/@esbuild-kit /app/apps/backend/node_modules/@esbuild-kit \
-    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/@drizzle-team /app/apps/backend/node_modules/@drizzle-team \
-    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/esbuild-register /app/apps/backend/node_modules/esbuild-register \
-    && rm -rf /app/apps/backend/node_modules/.pnpm-drizzle-kit \
+    && cp -r /tmp/node_modules/.pnpm/drizzle-kit@0.31.9/node_modules/drizzle-kit /app/apps/backend/node_modules/drizzle-kit \
+    && for p in esbuild @esbuild-kit @drizzle-team esbuild-register; do \
+         cp -rL /tmp/node_modules/.pnpm/drizzle-kit@0.31.9/node_modules/$p /app/apps/backend/node_modules/$p; \
+       done \
     && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
     && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' \
          > /app/apps/backend/node_modules/.bin/drizzle-kit \
