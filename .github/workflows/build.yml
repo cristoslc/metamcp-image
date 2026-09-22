@@ -33,15 +33,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Assert Dockerfile pins an upstream source SHA
+      - name: Assert Dockerfile pins a base image digest
         run: |
+          # Path D: thin extension of the Umbrella fork image (digest-pinned
+          # FROM) — not a source build. Older Path B source-build Dockerfiles
+          # pinned ARG METAMCP_SOURCE_SHA instead; either guard is valid,
+          # exactly one must be present.
+          BASE=$(grep -oP '(?<=^FROM ghcr\.io/umbrella-it-group/metamcp@)sha256:[0-9a-f]{64}' Dockerfile)
           SHA=$(grep -oP '(?<=^ARG METAMCP_SOURCE_SHA=)[0-9a-f]{40}' Dockerfile)
-          if [ -z "$SHA" ]; then
-            echo "Dockerfile must pin ARG METAMCP_SOURCE_SHA=<40-hex>"
+          if [ -z "$BASE" ] && [ -z "$SHA" ]; then
+            echo "Dockerfile must pin either a digest-pinned Umbrella FROM or ARG METAMCP_SOURCE_SHA=<40-hex>"
             exit 1
           fi
-          echo "Pinned source SHA: $SHA"
-          echo "SHA_PREFIX=${SHA:0:10}" >> "$GITHUB_ENV"
+          if [ -n "$BASE" ]; then
+            echo "Path D: base = $BASE"
+          else
+            echo "Path B source pin: $SHA"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -53,6 +61,16 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Derive image tags
+        id: tags
+        run: |
+          if [ -n "$BASE" ]; then
+            # Path D: tag by the base image digest prefix (unique per bump).
+            echo "tag=${BASE:19:10}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${SHA:0:10}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -61,12 +79,12 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ env.IMAGE }}:${{ env.SHA_PREFIX }}
+            ${{ env.IMAGE }}:${{ steps.tags.outputs.tag }}
             ${{ env.IMAGE }}:latest
 
       - name: Record amd64 manifest digest
         run: |
-          DIGEST=$(docker buildx imagetools inspect "$IMAGE:${SHA_PREFIX}" \
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE:${{ steps.tags.outputs.tag }}" \
             | grep -oP 'sha256:[0-9a-f]{64}' | head -1)
           echo "Digest: $DIGEST"
           {
