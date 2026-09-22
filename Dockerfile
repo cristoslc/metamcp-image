@@ -193,12 +193,11 @@ RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
     && for p in esbuild @esbuild-kit @drizzle-team esbuild-register; do \
          cp -rL "/tmp/node_modules/.pnpm/drizzle-kit@0.31.9/node_modules/$p" "/app/apps/backend/node_modules/$p"; \
        done \
-    && (node -e "require('/app/apps/backend/node_modules/esbuild')" 2>/dev/null || \
-        (cd /tmp && npm pack @esbuild/linux-x64@0.25.12 --silent \
-          && tar -xzf esbuild-linux-x64-0.25.12.tgz -C /tmp \
-          && rm -rf /app/apps/backend/node_modules/@esbuild \
-          && mkdir -p /app/apps/backend/node_modules/@esbuild \
-          && cp -r /tmp/package /app/apps/backend/node_modules/@esbuild/linux-x64)) \
+    && (cd /tmp && npm pack @esbuild/linux-x64@0.25.12 --silent \
+        && rm -rf /tmp/package && tar -xzf esbuild-linux-x64-0.25.12.tgz -C /tmp \
+        && rm -rf /app/apps/backend/node_modules/@esbuild \
+        && mkdir -p /app/apps/backend/node_modules/@esbuild \
+        && cp -r /tmp/package /app/apps/backend/node_modules/@esbuild/linux-x64) \
     && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
     && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' \
          > /app/apps/backend/node_modules/.bin/drizzle-kit \
