@@ -183,19 +183,19 @@ RUN CI=true pnpm install --prod
 # at the runner stage rewrites the lockfile and trips pnpm's
 # included-deps-conflict guard, npm chokes on workspace:*, and
 # --ignore-workspace drops the @repo/* workspace deps the backend
-# package.json references. Upstream needs drizzle-kit runnable from
-# apps/backend at runtime; install it into a scratch dir with pnpm, then
-# copy the package AND its deps into the backend node_modules, rewriting
-# the .bin shim to a direct node invocation of the copied bin (the
-# pnpm-generated shim hardcodes /tmp paths).
+# package.json references. Install drizzle-kit WITH its full pnpm store
+# (esbuild etc.) into the backend node_modules via a --ignore-workspace
+# install rooted at the backend dir, keeping upstream's devDep out of the
+# prod lockfile but present on disk. The .bin shim is rewritten to a
+# direct node call (pnpm shims hardcode /tmp paths).
 RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
-    && cp -r /tmp/node_modules/.pnpm /app/apps/backend/node_modules/.pnpm-drizzle-scratch \
+    && cp -r /tmp/node_modules/.pnpm /app/apps/backend/node_modules/.pnpm \
     && mkdir -p /app/apps/backend/node_modules/drizzle-kit \
     && cp -r /tmp/node_modules/.pnpm/drizzle-kit@0.31.9/node_modules/drizzle-kit/. /app/apps/backend/node_modules/drizzle-kit/ \
     && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
     && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' > /app/apps/backend/node_modules/.bin/drizzle-kit \
     && chmod +x /app/apps/backend/node_modules/.bin/drizzle-kit \
-    && /app/apps/backend/node_modules/.bin/drizzle-kit --version
+    && cd /app/apps/backend && CI=true node node_modules/.bin/drizzle-kit --version
 
 # Copy startup script
 COPY --from=source --chown=nextjs:nodejs /tmp/src/docker-entrypoint.sh ./
