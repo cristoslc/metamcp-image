@@ -180,18 +180,24 @@ RUN CI=true pnpm install --prod
 
 # Install drizzle-kit locally in backend for migrations (entrypoint runs
 # `pnpm exec drizzle-kit migrate` from apps/backend). A bare `pnpm add`
-# at the runner stage trips pnpm's included-deps-conflict guard; npm
-# chokes on workspace:*. So: install drizzle-kit (with its deps) into a
-# scratch dir via pnpm --ignore-workspace, then copy the packages flat
-# into backend node_modules. Flat is fine — Node resolves
-# require('esbuild') from node_modules/esbuild sitting next to
-# drizzle-kit. The .bin shim is rewritten to a direct node call (pnpm
-# shims hardcode the scratch /tmp paths). Verify with the exact command
-# the entrypoint runs.
+# at the runner stage trips pnpm's included-deps-conflict guard (the prod
+# install already wrote /app/node_modules), so install into a SCRATCH dir
+# with pnpm --ignore-workspace, then copy the .pnpm store's drizzle-kit
+# package into /app/apps/backend/node_modules with its own private deps
+# (esbuild etc.) nested INSIDE it — matching the resolution layout
+# drizzle-kit's bundle expects (verified: bin runs standalone from that
+# path). The .bin shim is rewritten to a direct node call (pnpm shims
+# hardcode the scratch /tmp paths).
 RUN cd /tmp && CI=true pnpm add --ignore-workspace drizzle-kit@0.31.9 \
-    && for d in /tmp/node_modules/*/; do n=$(basename "$d"); \
-         [ "$n" = ".pnpm" ] && continue; cp -rL "$d" /app/apps/backend/node_modules/; done \
-    && cp -rL /tmp/node_modules/.pnpm /app/apps/backend/node_modules/.pnpm \
+    && cp -r /tmp/node_modules/.pnpm/drizzle-kit@0.31.9 /app/apps/backend/node_modules/.pnpm-drizzle-kit \
+    && mkdir -p /app/apps/backend/node_modules/drizzle-kit \
+    && cp -r /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/drizzle-kit/. /app/apps/backend/node_modules/drizzle-kit/ \
+    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/esbuild /app/apps/backend/node_modules/esbuild \
+    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/@esbuild-kit /app/apps/backend/node_modules/@esbuild-kit \
+    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/@drizzle-team /app/apps/backend/node_modules/@drizzle-team \
+    && cp -rL /app/apps/backend/node_modules/.pnpm-drizzle-kit/node_modules/esbuild-register /app/apps/backend/node_modules/esbuild-register \
+    && rm -rf /app/apps/backend/node_modules/.pnpm-drizzle-kit \
+    && rm -f /app/apps/backend/node_modules/.bin/drizzle-kit \
     && printf '#!/bin/sh\nexec node /app/apps/backend/node_modules/drizzle-kit/bin.cjs "$@"\n' \
          > /app/apps/backend/node_modules/.bin/drizzle-kit \
     && chmod +x /app/apps/backend/node_modules/.bin/drizzle-kit \
