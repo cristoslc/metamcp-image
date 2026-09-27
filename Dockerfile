@@ -17,8 +17,11 @@
 # discipline (the index digest is not immutable; the attestation manifest
 # is Platform: unknown/unknown). Resolved 2026-09-22:
 #   docker buildx imagetools inspect ghcr.io/umbrella-it-group/metamcp:latest
-#   → linux/amd64 = ed1de394a5f4f6415e33ad094d51858a3804349171d27985b1779fdd4f015af9
-FROM ghcr.io/umbrella-it-group/metamcp@sha256:ed1de394a5f4f6415e33ad094d51858a3804349171d27985b1779fdd4f015af9
+#   → linux/amd64 = 77b0c820642cee1430667ad47c102acc4d0a97e80b7eecd7e8353ebb6ef6d3c0
+#   (2026-09-27 bump: ed1de394 → 77b0c820 — Umbrella PR #185 deps wave,
+#   ledgered 2026-09-25: 2 critical next + 3 hono advisories + sharp/js-yaml/vitest;
+#   RUNBOOK-016 Path D drift-gate review passed)
+FROM ghcr.io/umbrella-it-group/metamcp@sha256:77b0c820642cee1430667ad47c102acc4d0a97e80b7eecd7e8353ebb6ef6d3c0
 
 USER root
 # The base may ship a stale deb.nodesource.com repo whose SHA1 GPG key is
